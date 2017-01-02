@@ -10,7 +10,7 @@ import (
 
 	"testing"
 
-	"github.com/manucorporat/sse"
+	"github.com/gin-gonic/gin/sse"
 	"github.com/stretchr/testify/assert"
 )
 
