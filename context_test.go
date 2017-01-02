@@ -53,6 +53,37 @@ func must(err error) {
 	}
 }
 
+func TestContextFormFile(t *testing.T) {
+	buf := new(bytes.Buffer)
+	mw := multipart.NewWriter(buf)
+	w, err := mw.CreateFormFile("file", "test")
+	if assert.NoError(t, err) {
+		w.Write([]byte("test"))
+	}
+	mw.Close()
+	c, _ := CreateTestContext(httptest.NewRecorder())
+	c.Request, _ = http.NewRequest("POST", "/", buf)
+	c.Request.Header.Set("Content-Type", mw.FormDataContentType())
+	f, err := c.FormFile("file")
+	if assert.NoError(t, err) {
+		assert.Equal(t, "test", f.Filename)
+	}
+}
+
+func TestContextMultipartForm(t *testing.T) {
+	buf := new(bytes.Buffer)
+	mw := multipart.NewWriter(buf)
+	mw.WriteField("foo", "bar")
+	mw.Close()
+	c, _ := CreateTestContext(httptest.NewRecorder())
+	c.Request, _ = http.NewRequest("POST", "/", buf)
+	c.Request.Header.Set("Content-Type", mw.FormDataContentType())
+	f, err := c.MultipartForm()
+	if assert.NoError(t, err) {
+		assert.NotNil(t, f)
+	}
+}
+
 func TestContextReset(t *testing.T) {
 	router := New()
 	c := router.allocateContext()
@@ -358,9 +389,9 @@ func TestContextRenderJSON(t *testing.T) {
 
 	c.JSON(201, H{"foo": "bar"})
 
-	assert.Equal(t, w.Code, 201)
-	assert.Equal(t, w.Body.String(), "{\"foo\":\"bar\"}\n")
-	assert.Equal(t, w.HeaderMap.Get("Content-Type"), "application/json; charset=utf-8")
+	assert.Equal(t, 201, w.Code)
+	assert.Equal(t, "{\"foo\":\"bar\"}", w.Body.String())
+	assert.Equal(t, "application/json; charset=utf-8", w.HeaderMap.Get("Content-Type"))
 }
 
 // Tests that no JSON is rendered if code is 204
@@ -384,9 +415,9 @@ func TestContextRenderAPIJSON(t *testing.T) {
 	c.Header("Content-Type", "application/vnd.api+json")
 	c.JSON(201, H{"foo": "bar"})
 
-	assert.Equal(t, w.Code, 201)
-	assert.Equal(t, w.Body.String(), "{\"foo\":\"bar\"}\n")
-	assert.Equal(t, w.HeaderMap.Get("Content-Type"), "application/vnd.api+json")
+	assert.Equal(t, 201, w.Code)
+	assert.Equal(t, "{\"foo\":\"bar\"}", w.Body.String())
+	assert.Equal(t, "application/vnd.api+json", w.HeaderMap.Get("Content-Type"))
 }
 
 // Tests that no Custom JSON is rendered if code is 204
@@ -882,4 +913,26 @@ func TestContextGolangContext(t *testing.T) {
 	c.Set("foo", "bar")
 	assert.Equal(t, c.Value("foo"), "bar")
 	assert.Nil(t, c.Value(1))
+}
+
+func TestWebsocketsRequired(t *testing.T) {
+	// Example request from spec: https://tools.ietf.org/html/rfc6455#section-1.2
+	c, _ := CreateTestContext(httptest.NewRecorder())
+	c.Request, _ = http.NewRequest("GET", "/chat", nil)
+	c.Request.Header.Set("Host", "server.example.com")
+	c.Request.Header.Set("Upgrade", "websocket")
+	c.Request.Header.Set("Connection", "Upgrade")
+	c.Request.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+	c.Request.Header.Set("Origin", "http://example.com")
+	c.Request.Header.Set("Sec-WebSocket-Protocol", "chat, superchat")
+	c.Request.Header.Set("Sec-WebSocket-Version", "13")
+
+	assert.True(t, c.IsWebsocket())
+
+	// Normal request, no websocket required.
+	c, _ = CreateTestContext(httptest.NewRecorder())
+	c.Request, _ = http.NewRequest("GET", "/chat", nil)
+	c.Request.Header.Set("Host", "server.example.com")
+
+	assert.False(t, c.IsWebsocket())
 }

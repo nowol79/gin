@@ -102,12 +102,22 @@ BenchmarkZeus_GithubAll 		| 2000 		| 944234 	| 300688 	| 2648
     import "net/http"
     ```
 
+4. (Optional) Use latest changes (note: they may be broken and/or unstable):
+    ```sh
+    $ GIN_PATH=$GOPATH/src/gopkg.in/gin-gonic/gin.v1
+    $ git -C $GIN_PATH checkout develop
+    $ git -C $GIN_PATH pull origin develop
+    ```
+
 ## API Examples
 
 #### Using GET, POST, PUT, PATCH, DELETE and OPTIONS
 
 ```go
 func main() {
+	// Disable Console Color
+	// gin.DisableConsoleColor()
+
 	// Creates a gin router with default middleware:
 	// logger and recovery (crash-free) middleware
 	router := gin.Default()
@@ -371,8 +381,41 @@ func main() {
 }
 ```
 
+#### Bind Query String
 
-###Multipart/Urlencoded binding
+See the [detail information](https://github.com/gin-gonic/gin/issues/742#issuecomment-264681292).
+
+```go
+package main
+
+import "log"
+import "github.com/gin-gonic/gin"
+
+type Person struct {
+	Name    string `form:"name"`
+	Address string `form:"address"`
+}
+
+func main() {
+	route := gin.Default()
+	route.GET("/testing", startPage)
+	route.Run(":8085")
+}
+
+func startPage(c *gin.Context) {
+	var person Person
+	if c.Bind(&person) == nil {
+		log.Println(person.Name)
+		log.Println(person.Address)
+	}
+
+	c.String(200, "Success")
+}
+```
+
+
+### Multipart/Urlencoded binding
+
 ```go
 package main
 
